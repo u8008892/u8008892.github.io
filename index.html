@@ -576,7 +576,7 @@ viewport.addEventListener('touchmove', function(e) {
     const dist = Math.hypot(dx, dy);
     const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
     const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    const ns = clampS(scale * dist / lastDist), ratio = ns / scale;
+    const ns = clampS(scale * (1 + (dist / lastDist - 1) * 0.4)), ratio = ns / scale;
     tx = mx - ratio * (mx - lastTx);
     ty = my - ratio * (my - lastTy);
     scale = ns; applyT();
