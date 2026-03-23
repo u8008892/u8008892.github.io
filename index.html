@@ -508,10 +508,25 @@ NODES.forEach(function(n) {
     if (activeNode) activeNode.classList.remove('active');
     activeNode = el; el.classList.add('active'); openSidebar(n);
   });
+  // Mobile tap — separate from drag
+  el.addEventListener('touchstart', function(e) {
+    e._nodeTouchStartX = e.touches[0].clientX;
+    e._nodeTouchStartY = e.touches[0].clientY;
+  }, { passive: true });
+  el.addEventListener('touchend', function(e) {
+    const dx = e.changedTouches[0].clientX - e._nodeTouchStartX;
+    const dy = e.changedTouches[0].clientY - e._nodeTouchStartY;
+    // Only treat as a tap if finger barely moved
+    if (Math.hypot(dx, dy) < 8) {
+      e.preventDefault(); hideTooltip();
+      if (activeNode === el && sidebar.classList.contains('open')) { closeSidebar(); return; }
+      if (activeNode) activeNode.classList.remove('active');
+      activeNode = el; el.classList.add('active'); openSidebar(n);
+    }
+  });
   el.addEventListener('mouseenter', function(e) { showTooltip(e, n); });
   el.addEventListener('mousemove',  function(e) { positionTooltip(e); });
   el.addEventListener('mouseleave', function()  { hideTooltip(); });
-  stage.appendChild(el);
 });
 
 let scale=1, tx=0, ty=0;
@@ -548,8 +563,10 @@ window.addEventListener('mousemove', function(e) {
 window.addEventListener('mouseup', function() { dragging = false; });
 
 // Touch support
-let lastDist = null, lastTx, lastTy, lastMx, lastMy;
+// Touch support
+let lastDist = null, pinchMx, pinchMy, pinchScale, pinchTx, pinchTy;
 viewport.addEventListener('touchstart', function(e) {
+  hideTooltip();
   if (e.touches.length === 1) {
     dragging = true;
     dsx = e.touches[0].clientX; dsy = e.touches[0].clientY; dtx = tx; dty = ty;
@@ -558,9 +575,14 @@ viewport.addEventListener('touchstart', function(e) {
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     lastDist = Math.hypot(dx, dy);
-    lastMx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-    lastMy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    lastTx = tx; lastTy = ty;
+    // Midpoint between fingers — fixed as the zoom anchor
+    const r = viewport.getBoundingClientRect();
+    pinchMx = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - r.left;
+    pinchMy = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - r.top;
+    // Snapshot scale and translation at pinch start
+    pinchScale = scale;
+    pinchTx = tx;
+    pinchTy = ty;
   }
   e.preventDefault();
 }, { passive: false });
@@ -574,12 +596,16 @@ viewport.addEventListener('touchmove', function(e) {
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     const dist = Math.hypot(dx, dy);
-    const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-    const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    const ns = clampS(scale * (1 + (dist / lastDist - 1) * 0.4)), ratio = ns / scale;
-    tx = mx - ratio * (mx - lastTx);
-    ty = my - ratio * (my - lastTy);
-    scale = ns; applyT();
+    // Scale relative to pinch-start snapshot, damped to 30%
+    const rawRatio = dist / lastDist;
+    const dampedRatio = 1 + (rawRatio - 1) * 0.3;
+    const ns = clampS(pinchScale * dampedRatio);
+    const ratio = ns / pinchScale;
+    // Zoom anchored to fixed midpoint
+    tx = pinchMx - ratio * (pinchMx - pinchTx);
+    ty = pinchMy - ratio * (pinchMy - pinchTy);
+    scale = ns;
+    applyT();
   }
   e.preventDefault();
 }, { passive: false });
