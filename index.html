@@ -508,25 +508,10 @@ NODES.forEach(function(n) {
     if (activeNode) activeNode.classList.remove('active');
     activeNode = el; el.classList.add('active'); openSidebar(n);
   });
-  // Mobile tap — separate from drag
-  el.addEventListener('touchstart', function(e) {
-    e._nodeTouchStartX = e.touches[0].clientX;
-    e._nodeTouchStartY = e.touches[0].clientY;
-  }, { passive: true });
-  el.addEventListener('touchend', function(e) {
-    const dx = e.changedTouches[0].clientX - e._nodeTouchStartX;
-    const dy = e.changedTouches[0].clientY - e._nodeTouchStartY;
-    // Only treat as a tap if finger barely moved
-    if (Math.hypot(dx, dy) < 8) {
-      e.preventDefault(); hideTooltip();
-      if (activeNode === el && sidebar.classList.contains('open')) { closeSidebar(); return; }
-      if (activeNode) activeNode.classList.remove('active');
-      activeNode = el; el.classList.add('active'); openSidebar(n);
-    }
-  });
   el.addEventListener('mouseenter', function(e) { showTooltip(e, n); });
   el.addEventListener('mousemove',  function(e) { positionTooltip(e); });
   el.addEventListener('mouseleave', function()  { hideTooltip(); });
+  stage.appendChild(el);
 });
 
 let scale=1, tx=0, ty=0;
