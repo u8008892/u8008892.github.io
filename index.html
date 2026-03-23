@@ -13,7 +13,7 @@
   --rq1:#e07b54; --rq1-bg:rgba(224,123,84,0.12); --rq1-border:rgba(224,123,84,0.55);
   --rq2:#6ab187; --rq2-bg:rgba(106,177,135,0.12); --rq2-border:rgba(106,177,135,0.55);
   --rq3:#a78bda; --rq3-bg:rgba(167,139,218,0.12); --rq3-border:rgba(167,139,218,0.55);
-  --sidebar-w:46vw; --header-h:61px;
+  --sidebar-w: min(46vw, 92vw); --header-h:61px;
 }
 html,body { width:100%; height:100%; background:var(--bg); color:var(--text); font-family:'JetBrains Mono',monospace; overflow:hidden; }
 header { position:fixed; top:0; left:0; right:0; z-index:30; padding:18px 40px 16px; border-bottom:1px solid var(--border); background:var(--bg); display:flex; align-items:center; gap:24px; }
@@ -89,6 +89,12 @@ p.hint { font-size:11px; color:var(--muted); white-space:nowrap; margin-left:aut
 .tooltip-title { font-family:'Fraunces',serif; font-weight:600; font-size:13px; margin-bottom:5px; }
 .tooltip-summary { color:#9ca3af; }
 .tooltip-hint { margin-top:7px; font-size:10px; color:var(--muted); border-top:1px solid var(--border); padding-top:7px; }
+@media (max-width: 600px) {
+  :root { --sidebar-w: 92vw; }
+  header { padding: 12px 16px; }
+  p.hint { display: none; }
+  #sidebar-inner { padding: 32px 24px 80px; }
+}
 </style>
 </head>
 <body>
@@ -540,6 +546,47 @@ window.addEventListener('mousemove', function(e) {
   tx = dtx + (e.clientX-dsx); ty = dty + (e.clientY-dsy); applyT();
 });
 window.addEventListener('mouseup', function() { dragging = false; });
+
+// Touch support
+let lastDist = null, lastTx, lastTy, lastMx, lastMy;
+viewport.addEventListener('touchstart', function(e) {
+  if (e.touches.length === 1) {
+    dragging = true;
+    dsx = e.touches[0].clientX; dsy = e.touches[0].clientY; dtx = tx; dty = ty;
+  } else if (e.touches.length === 2) {
+    dragging = false;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    lastDist = Math.hypot(dx, dy);
+    lastMx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    lastMy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    lastTx = tx; lastTy = ty;
+  }
+  e.preventDefault();
+}, { passive: false });
+
+viewport.addEventListener('touchmove', function(e) {
+  if (e.touches.length === 1 && dragging) {
+    tx = dtx + (e.touches[0].clientX - dsx);
+    ty = dty + (e.touches[0].clientY - dsy);
+    applyT();
+  } else if (e.touches.length === 2 && lastDist) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.hypot(dx, dy);
+    const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    const ns = clampS(scale * dist / lastDist), ratio = ns / scale;
+    tx = mx - ratio * (mx - lastTx);
+    ty = my - ratio * (my - lastTy);
+    scale = ns; applyT();
+  }
+  e.preventDefault();
+}, { passive: false });
+
+viewport.addEventListener('touchend', function() {
+  dragging = false; lastDist = null;
+});
 
 document.getElementById('zoomIn').addEventListener('click', function() {
   const cx=viewport.clientWidth/2, cy=viewport.clientHeight/2, ns=clampS(scale*1.2), r=ns/scale;
