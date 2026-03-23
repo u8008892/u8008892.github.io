@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snow Gum Pipeline</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300;1,9..144,600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#0f1117; --surface:#171b26; --surface2:#1e2433; --border:#2a3040;
+  --text:#e8eaf0; --muted:#6b7280; --accent:#7b92b2;
+  --rq1:#e07b54; --rq1-bg:rgba(224,123,84,0.12); --rq1-border:rgba(224,123,84,0.55);
+  --rq2:#6ab187; --rq2-bg:rgba(106,177,135,0.12); --rq2-border:rgba(106,177,135,0.55);
+  --rq3:#a78bda; --rq3-bg:rgba(167,139,218,0.12); --rq3-border:rgba(167,139,218,0.55);
+  --sidebar-w:46vw; --header-h:61px;
+}
+html,body { width:100%; height:100%; background:var(--bg); color:var(--text); font-family:'JetBrains Mono',monospace; overflow:hidden; }
+header { position:fixed; top:0; left:0; right:0; z-index:30; padding:18px 40px 16px; border-bottom:1px solid var(--border); background:var(--bg); display:flex; align-items:center; gap:24px; }
+header h1 { font-family:'Fraunces',serif; font-weight:300; font-size:19px; letter-spacing:-0.3px; white-space:nowrap; }
+header h1 em { font-style:italic; color:var(--accent); }
+p.hint { font-size:11px; color:var(--muted); white-space:nowrap; margin-left:auto; }
+.zoom-controls { display:flex; align-items:center; gap:6px; }
+.zoom-btn { width:28px; height:28px; background:var(--surface); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:16px; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:border-color 0.15s,color 0.15s; user-select:none; }
+.zoom-btn:hover { border-color:var(--accent); color:var(--accent); }
+.zoom-label { font-size:11px; color:var(--muted); width:38px; text-align:center; }
+#shell { position:fixed; top:var(--header-h); left:0; right:0; bottom:0; display:flex; }
+#viewport { flex:1 1 auto; overflow:hidden; cursor:grab; position:relative; }
+#viewport:active { cursor:grabbing; }
+#stage { position:absolute; top:0; left:0; transform-origin:0 0; }
+#connectors { position:absolute; top:0; left:0; pointer-events:none; }
+#sidebar { flex:0 0 0; width:0; overflow:hidden; border-left:0px solid var(--border); background:var(--surface); position:relative; transition:flex-basis 0.35s cubic-bezier(0.4,0,0.2,1),width 0.35s cubic-bezier(0.4,0,0.2,1),border-left-width 0.01s 0.34s; }
+#sidebar.open { flex:0 0 var(--sidebar-w); width:var(--sidebar-w); border-left-width:1px; transition:flex-basis 0.35s cubic-bezier(0.4,0,0.2,1),width 0.35s cubic-bezier(0.4,0,0.2,1),border-left-width 0s; }
+#sidebar-inner { width:100%; height:100%; overflow-y:auto; padding:48px 52px 96px; }
+#sidebar-inner h2 { font-family:'Fraunces',serif; font-size:20px; font-weight:600; letter-spacing:-0.3px; margin-bottom:14px; color:var(--text); }
+#sidebar-inner p { font-family:'Fraunces',serif; font-size:15px; line-height:1.8; color:#c8cad4; margin-bottom:14px; font-weight:300; }
+#sidebar-inner p:last-child { margin-bottom:0; }
+#sidebar-inner em { font-style:italic; }
+#sidebar-inner strong { font-weight:600; color:var(--text); }
+#sidebar-inner code { font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--surface2); border:1px solid var(--border); border-radius:3px; padding:1px 5px; color:var(--accent); }
+#sidebar-inner pre { font-family:'JetBrains Mono',monospace; font-size:11px; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:14px 16px; color:#a8c0d8; line-height:1.8; margin:14px 0; white-space:pre-wrap; }
+#sidebar-inner .rq-tag { display:inline-block; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.06em; text-transform:uppercase; border-radius:4px; padding:2px 8px; margin-bottom:14px; }
+#sidebar-inner .note { border-left:2px solid var(--border); padding-left:16px; margin:18px 0; color:var(--muted); font-size:14px; line-height:1.7; font-style:italic; font-family:'Fraunces',serif; }
+#sidebar-close { position:absolute; left:0; top:50%; transform:translateY(-50%); z-index:10; width:20px; height:48px; background:var(--surface2); border:1px solid var(--border); border-left:none; border-radius:0 6px 6px 0; cursor:pointer; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.2s 0.1s,background 0.15s,border-color 0.15s; }
+#sidebar.open #sidebar-close { opacity:1; pointer-events:auto; }
+#sidebar-close:hover { background:var(--surface); border-color:var(--accent); }
+#sidebar-tab { position:fixed; right:0; top:50%; transform:translateY(-50%); z-index:25; width:20px; height:48px; background:var(--surface2); border:1px solid var(--border); border-right:none; border-radius:6px 0 0 6px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.15s,border-color 0.15s,opacity 0.25s; opacity:1; }
+#sidebar-tab:hover { background:var(--surface); border-color:var(--accent); }
+#sidebar-tab.hidden { opacity:0; pointer-events:none; }
+.node { position:absolute; width:172px; height:48px; background:var(--surface); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text); transition:background 0.15s,border-color 0.15s,box-shadow 0.15s; z-index:2; }
+.node.action { border-radius:6px; }
+.node.artifact { border-radius:24px; }
+.node:hover { background:var(--surface2); border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+.node.active { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); background:var(--surface2); }
+.node.rq1 { background:var(--rq1-bg); border-color:var(--rq1-border); }
+.node.rq1:hover,.node.rq1.active { background:rgba(224,123,84,0.2); border-color:var(--rq1); box-shadow:0 0 0 1px var(--rq1); }
+.node.rq1 .node-label { color:#f0a882; }
+.node.rq2 { background:var(--rq2-bg); border-color:var(--rq2-border); }
+.node.rq2:hover,.node.rq2.active { background:rgba(106,177,135,0.2); border-color:var(--rq2); box-shadow:0 0 0 1px var(--rq2); }
+.node.rq2 .node-label { color:#8ecfab; }
+.node.rq3 { background:var(--rq3-bg); border-color:var(--rq3-border); }
+.node.rq3:hover,.node.rq3.active { background:rgba(167,139,218,0.2); border-color:var(--rq3); box-shadow:0 0 0 1px var(--rq3); }
+.node.rq3 .node-label { color:#c4b0ec; }
+.node-label { font-size:11px; font-weight:600; letter-spacing:0.03em; text-align:center; padding:0 10px; line-height:1.3; }
+.lane-label { position:absolute; font-size:9px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); pointer-events:none; }
+.shape-legend { position:fixed; bottom:24px; left:24px; z-index:20; display:flex; flex-direction:column; align-items:flex-start; }
+.shape-toggle { width:32px; height:32px; background:var(--surface2); border:1px solid var(--border); border-radius:6px; cursor:pointer; display:none; align-items:center; justify-content:center; transition:border-color 0.15s,background 0.15s; }
+.shape-toggle:hover { border-color:var(--accent); background:var(--surface); }
+.shape-toggle.visible { display:flex; }
+.shape-panel { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:12px 16px; display:flex; flex-direction:column; gap:9px; }
+.shape-panel.hidden { display:none; }
+.shape-legend-title { font-size:9px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); cursor:pointer; user-select:none; }
+.legend-row { display:flex; align-items:center; gap:10px; font-size:10px; color:var(--muted); letter-spacing:0.05em; }
+.legend-rect { width:56px; height:18px; background:var(--surface); border:1px solid var(--border); border-radius:3px; flex-shrink:0; }
+.legend-pill { width:56px; height:18px; background:var(--surface); border:1px solid var(--border); border-radius:9px; flex-shrink:0; }
+.rq-legend { position:fixed; top:85px; left:24px; z-index:20; }
+.rq-toggle { width:32px; height:32px; background:var(--surface2); border:1px solid var(--border); border-radius:6px; cursor:pointer; display:none; align-items:center; justify-content:center; transition:border-color 0.15s,background 0.15s; }
+.rq-toggle:hover { border-color:var(--accent); background:var(--surface); }
+.rq-toggle.visible { display:flex; }
+.rq-panel { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:14px 16px; display:flex; flex-direction:column; gap:11px; max-width:300px; }
+.rq-panel.hidden { display:none; }
+.rq-legend-title { font-size:9px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); cursor:pointer; user-select:none; }
+.legend-rq-row { display:flex; align-items:flex-start; gap:10px; line-height:1.5; }
+.legend-rq-swatch { flex-shrink:0; width:3px; align-self:stretch; border-radius:2px; min-height:14px; }
+.legend-rq-text { font-family:'Fraunces',serif; font-weight:300; font-size:12px; font-style:italic; }
+#tooltip { position:fixed; z-index:100; pointer-events:none; opacity:0; transition:opacity 0.15s; max-width:260px; }
+#tooltip.visible { opacity:1; }
+.tooltip-inner { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:12px 14px; font-size:11px; line-height:1.6; color:var(--text); box-shadow:0 8px 32px rgba(0,0,0,0.5); }
+.tooltip-title { font-family:'Fraunces',serif; font-weight:600; font-size:13px; margin-bottom:5px; }
+.tooltip-summary { color:#9ca3af; }
+.tooltip-hint { margin-top:7px; font-size:10px; color:var(--muted); border-top:1px solid var(--border); padding-top:7px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><em>Snow Gum</em> Pipeline</h1>
+  <p class="hint">Scroll to zoom &nbsp;&middot;&nbsp; Drag to pan &nbsp;&middot;&nbsp; Click node for details</p>
+  <div class="zoom-controls">
+    <button class="zoom-btn" id="zoomOut">&minus;</button>
+    <span class="zoom-label" id="zoomLabel">100%</span>
+    <button class="zoom-btn" id="zoomIn">+</button>
+    <button class="zoom-btn" id="zoomReset" style="width:auto;padding:0 10px;font-size:11px;">fit</button>
+  </div>
+</header>
+<div id="shell">
+  <div id="viewport">
+    <div id="stage"><svg id="connectors"></svg></div>
+  </div>
+  <div id="sidebar">
+    <button id="sidebar-close" title="Close">
+      <svg width="10" height="14" viewBox="0 0 10 14" fill="none"><polyline points="3,2 8,7 3,12" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div id="sidebar-inner"></div>
+  </div>
+</div>
+<button id="sidebar-tab" title="Open panel">
+  <svg width="10" height="14" viewBox="0 0 10 14" fill="none"><polyline points="7,2 2,7 7,12" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</button>
+<div class="shape-legend">
+  <button class="shape-toggle" id="shapeToggle" title="Node Types">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="5" height="5" rx="1" stroke="#6b7280" stroke-width="1.2"/><rect x="9.5" y="1.5" width="5" height="5" rx="2.5" stroke="#6b7280" stroke-width="1.2"/><rect x="1.5" y="9.5" width="5" height="5" rx="1" stroke="#6b7280" stroke-width="1.2"/><rect x="9.5" y="9.5" width="5" height="5" rx="2.5" stroke="#6b7280" stroke-width="1.2"/></svg>
+  </button>
+  <div class="shape-panel" id="shapePanel">
+    <div class="shape-legend-title" id="shapePanelTitle">Node Types</div>
+    <div class="legend-row"><div class="legend-rect"></div><span>Process</span></div>
+    <div class="legend-row"><div class="legend-pill"></div><span>Artifact / Data</span></div>
+  </div>
+</div>
+<div class="rq-legend">
+  <button class="rq-toggle" id="rqToggle" title="Research Questions">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="2" stroke="#6b7280" stroke-width="1.2"/><line x1="4" y1="5.5" x2="12" y2="5.5" stroke="#6b7280" stroke-width="1.2" stroke-linecap="round"/><line x1="4" y1="8" x2="12" y2="8" stroke="#6b7280" stroke-width="1.2" stroke-linecap="round"/><line x1="4" y1="10.5" x2="12" y2="10.5" stroke="#6b7280" stroke-width="1.2" stroke-linecap="round"/></svg>
+  </button>
+  <div class="rq-panel" id="rqPanel">
+    <div class="rq-legend-title" id="rqPanelTitle">Research Questions</div>
+    <div class="legend-rq-row">
+      <div class="legend-rq-swatch" style="background:var(--rq1);"></div>
+      <span class="legend-rq-text" style="color:var(--rq1);">Are <em>E. pauciflora</em> subspecies genomically distinct?</span>
+    </div>
+    <div class="legend-rq-row">
+      <div class="legend-rq-swatch" style="background:var(--rq2);"></div>
+      <span class="legend-rq-text" style="color:var(--rq2);">Which loci and climate variables drive local adaptation?</span>
+    </div>
+    <div class="legend-rq-row">
+      <div class="legend-rq-swatch" style="background:var(--rq3);"></div>
+      <span class="legend-rq-text" style="color:var(--rq3);">What is the predicted genomic offset and maladaptation risk?</span>
+    </div>
+  </div>
+</div>
+<div id="tooltip"><div class="tooltip-inner">
+  <div class="tooltip-title" id="tt-title"></div>
+  <div class="tooltip-summary" id="tt-summary"></div>
+  <div class="tooltip-hint">click to open details</div>
+</div></div>
+
+<script>
+const COL=220, ROW=108, NW=172, NH=48, PAD=80, CY=200;
+
+const NODES = [
+  // SEQUENCING + GENOTYPING
+  {id:'sample_collection', label:'Sample Collection', type:'action', col:0, row:0,
+   summary:'Leaf tissue from niphophila and pauciflora across the Snowy Mountains and ACT.',
+   nb:'<h2>Sample Collection</h2><p>Leaf tissue collected from <em>E. pauciflora</em> subsp. <em>niphophila</em> and subsp. <em>pauciflora</em> populations across the Snowy Mountains and ACT. Samples dried in silica gel immediately after collection.</p>'},
+  {id:'dna_extraction', label:'DNA Extraction', type:'action', col:1, row:0,
+   summary:'Genomic DNA extracted from silica-dried tissue. Feeds both sequencing arms.',
+   nb:'<h2>DNA Extraction</h2><p>Genomic DNA extracted using a modified CTAB protocol. Quantified by Qubit fluorometry and quality-assessed by gel electrophoresis prior to library preparation. High molecular weight DNA required for the Nanopore arm.</p>'},
+  {id:'ref', label:'E. regnans ref', type:'artifact', col:4, row:-3,
+   summary:'NCBI E. regnans assembly ~640 Mb. Alignment target for both arms.',
+   nb:'<h2>E. regnans Reference Genome</h2><p>NCBI <em>Eucalyptus regnans</em> assembly. ~640 Mb across 11 pseudochromosomes, scaffold N50 ~56 Mb. Alignment target for both Illumina and Nanopore arms.</p>'},
+  // Short-read arm
+  {id:'sr_lib', label:'Illumina Library Prep', type:'action', col:2.5, row:-1.5,
+   summary:'Short-read libraries prepared for Illumina NovaSeq 6000.',
+   nb:'<h2>Illumina Library Prep</h2><p>Libraries prepared from 100-500 ng gDNA using NEBNext Ultra II FS DNA Library Prep Kit. Target insert size 350 bp. Unique dual indexes. Pooled for NovaSeq 6000, 150 bp PE.</p>'},
+  {id:'sr_qc', label:'QC + Trim', type:'action', col:3.5, row:-1.5,
+   summary:'FastQC assessment and Trimmomatic adapter/quality trimming.',
+   nb:'<h2>QC and Trimming</h2><p>Raw reads assessed with FastQC. Adapters and low-quality bases (Phred &lt; 20) trimmed with Trimmomatic. Reads &lt; 36 bp discarded.</p><pre>ILLUMINACLIP: TruSeq3-PE.fa:2:30:10\nLEADING/TRAILING: 3\nSLIDINGWINDOW: 4:20\nMINLEN: 36</pre>'},
+  {id:'bwa', label:'BWA-MEM', type:'action', col:4.5, row:-1.5,
+   summary:'Illumina reads aligned to the E. regnans reference.',
+   nb:'<h2>BWA-MEM Alignment</h2><p>Trimmed reads aligned to the <em>E. regnans</em> reference using BWA-MEM with default parameters. No chromosome-scale <em>E. pauciflora</em> assembly currently exists; <em>E. regnans</em> is the closest available reference within Monocalyptus.</p>'},
+  {id:'sr_bam', label:'BAM Processing', type:'action', col:5.5, row:-1.5,
+   summary:'Sort, index, mark duplicates with SAMtools and GATK.',
+   nb:'<h2>BAM Processing - Short Read</h2><p>SAM to BAM, coordinate-sorted, indexed with SAMtools. PCR duplicates marked with GATK MarkDuplicates. Duplicate-marked BAMs used for all downstream variant calling.</p>'},
+  {id:'deepvar', label:'DeepVariant', type:'action', col:6.5, row:-1.5,
+   summary:'Per-sample SNP/indel calling via neural network caller. Output: per-sample gVCF.',
+   nb:'<h2>DeepVariant</h2><p>Per-sample SNP and indel calling using Google DeepVariant v1.6 (WGS model). Each sample called independently, producing a per-sample gVCF suitable for joint genotyping.</p>'},
+  // Long-read arm
+  {id:'lr_lib', label:'ONT Library Prep', type:'action', col:2.5, row:1.5,
+   summary:'Nanopore libraries using ONT SQK-LSK114. PromethION R10.4.1.',
+   nb:'<h2>ONT Library Prep</h2><p>Libraries prepared from high molecular weight gDNA using ONT Ligation Sequencing Kit (SQK-LSK114). DNA sheared to ~20 kb. Sequenced on PromethION R10.4.1 flow cell.</p>'},
+  {id:'basecall', label:'Basecalling', type:'action', col:3.5, row:1.5,
+   summary:'ONT Dorado super-accuracy model. Q < 10 filtered.',
+   nb:'<h2>Basecalling</h2><p>Raw POD5 signal basecalled using ONT Dorado, super-accuracy model (<code>dna_r10.4.1_e8.2_400bps_sup</code>). Reads with mean Q &lt; 10 filtered.</p>'},
+  {id:'minimap', label:'Minimap2', type:'action', col:4.5, row:1.5,
+   summary:'Long reads aligned to E. regnans reference in map-ont mode.',
+   nb:'<h2>Minimap2</h2><p>Long reads aligned using Minimap2 in <code>map-ont</code> mode. Same reference as short-read arm.</p><pre>minimap2 -ax map-ont -t 16 --secondary=no \\\n  E_regnans_ref.fa reads.bam</pre>'},
+  {id:'lr_bam', label:'BAM Processing', type:'action', col:5.5, row:1.5,
+   summary:'Sort, filter supplementary alignments, mark duplicates. Coverage < 5x excluded.',
+   nb:'<h2>BAM Processing - Long Read</h2><p>Coordinate-sorted and indexed. Supplementary and secondary alignments filtered (<code>samtools view -F 2308</code>). Duplicates marked. Samples with mean coverage &lt; 5x excluded.</p>'},
+  {id:'longcalld', label:'LongcallD', type:'action', col:6.5, row:1.5,
+   summary:'Per-sample variant calling optimised for ONT error profiles.',
+   nb:'<h2>LongcallD</h2><p>Per-sample variant calling using LongcallD, designed for Oxford Nanopore error profiles. Accounts for non-random error patterns characteristic of ONT chemistry. Output: per-sample VCF.</p>'},
+
+  // JOINT GENOTYPING + FILTERING
+  {id:'left_join', label:'Left Join', type:'action', col:8, row:0,
+   summary:'Nanopore VCFs left-joined onto the short-read site list via GLnexus.',
+   nb:'<h2>Left Join</h2><p>Per-sample VCFs from DeepVariant and LongcallD merged using a left-join strategy anchored on the short-read site list. Sites present only in long-read VCFs discarded. Joint genotyping via GLnexus.</p>'},
+  {id:'samp_filt', label:'Sample Filtering', type:'action', col:9, row:0,
+   summary:'Drops duplicates (KING > 0.45), outgroups, low-coverage, high-missingness samples.',
+   nb:'<h2>Sample Filtering</h2><p>Samples excluded on: (1) pairwise kinship &gt; 0.45 (duplicates/mislabelled); (2) outgroup status; (3) mean genome coverage &lt; 5x; (4) genotype missingness &gt; 20%. Per-individual missingness assessed with <code>bcftools stats -S -</code> before filtering.</p>'},
+  {id:'snp_filt', label:'SNP Filtering', type:'action', col:10, row:0,
+   summary:'Biallelic SNPs, MAF >= 0.005, missingness < 5%. All snow gum samples.',
+   nb:'<h2>SNP Filtering</h2><p>Subset to biallelic SNPs only (<code>bcftools view -m2 -M2 -v snps</code>). MAF &ge; 0.005 and genotype missingness &lt; 5% calculated across all retained samples. Indels and multi-allelic sites excluded.</p>'},
+  {id:'full_vcf', label:'Snow Gum VCF', type:'artifact', col:11, row:0,
+   summary:'Filtered VCF - all snow gum samples (niphophila + pauciflora). Central artifact.',
+   nb:'<h2>Snow Gum VCF</h2><p>Filtered, analysis-ready VCF retaining all snow gum samples - both <em>niphophila</em> and <em>pauciflora</em>. Biallelic SNPs passing MAF and missingness thresholds. This is the central artifact feeding both the population structure branch and the GEA ensemble.</p>'},
+
+  // GENOTYPE MATRIX PREPARATION
+  {id:'geno_matrix', label:'Genotype Matrix Prep', type:'action', col:12, row:0,
+   summary:'VCF converted to .raw dosage matrix. Residual missing values imputed by mean population allele frequency.',
+   nb:'<h2>Genotype Matrix Preparation</h2><p>The filtered VCF is exported to a numeric dosage matrix (0/1/2 additive coding) using PLINK2 <code>--export A</code>. This .raw matrix is the response variable Y for RDA, pRDA, and GF.</p><p><strong>Imputation:</strong> Residual missing genotypes (passing the &lt;5% site-level threshold but present in individual cells) are imputed using mean allele frequency at that site, calculated within each population. This is the standard imputation approach for RDA-based GEA and avoids listwise deletion of samples with any missing data.</p><pre>plink2 --vcf snow_gum_filtered.vcf.gz \\\n  --export A \\\n  --out geno_matrix \\\n  --double-id --allow-extra-chr</pre><div class="note">Mean imputation is appropriate here because missingness is low (&lt;5% per site) and random with respect to genotype. More sophisticated imputation (e.g. Beagle) is not warranted at this missingness level and would introduce spurious haplotype structure.</div>'},
+  {id:'geno_matrix_art', label:'Imputed Genotype Matrix', type:'artifact', col:12, row:1.5,
+   summary:'Numeric dosage matrix (0/1/2), mean-imputed. Input Y matrix for RDA, pRDA, GF.',
+   nb:'<h2>Imputed Genotype Matrix</h2><p>Numeric genotype dosage matrix (individuals x SNPs, values 0/1/2) with residual missing values filled by mean population allele frequency. This is the response matrix Y for all multivariate GEA methods: RDA, pRDA, and GF. LFMM and BayPass use the VCF directly and do not require this matrix.</p>'},
+
+  // POPULATION STRUCTURE
+  {id:'ld_prune', label:'LD Pruning', type:'action', col:13, row:-3,
+   summary:'Window 50, step 10, r2 < 0.1. LD-pruned site list for PCA.',
+   nb:'<h2>LD Pruning</h2><p>SNPs pruned with PLINK2 sliding window (50 SNPs, step 10, r2 &lt; 0.1) to reduce LD inflation of PCA axes.</p><pre>plink2 --indep-pairwise 50 10 0.1 \\\n  --double-id --allow-extra-chr \\\n  --vcf-half-call m</pre>'},
+  {id:'pca', label:'PCA', type:'action', col:14, row:-3, rq:'rq1',
+   summary:'PCA on LD-pruned genotypes. Tracy-Widom test determines K significant PCs.',
+   nb:'<h2>PCA</h2><p>PCA on LD-pruned genotype matrix using PLINK2 (<code>--pca</code>). Top 20 PCs retained. Significant PCs determined by Tracy-Widom test. K significant PCs serve as (1) conditioning variables in pRDA and LFMM, and (2) the neutral structure matrix in variance partitioning. Clustering by subspecies along early PCs provides evidence for genomic distinctiveness.</p>'},
+  {id:'fst', label:'Fst Scan', type:'action', col:13, row:-4, rq:'rq1',
+   summary:'Weir & Cockerham Fst. Global Fst ~0.091. 50 kb window scan.',
+   nb:'<h2>FST Scan</h2><p>Weir &amp; Cockerham FST between subsp. <em>niphophila</em> and subsp. <em>pauciflora</em> using VCFtools. Global weighted FST ~0.091 - substantial divergence validating subspecific delimitation. Per-site values smoothed in 50 kb windows (25 kb step). Outlier windows exceed 99th percentile.</p><pre>vcftools --weir-fst-pop niphophila.txt \\\n         --weir-fst-pop pauciflora.txt \\\n         --fst-window-size 50000 \\\n         --fst-window-step 25000</pre>'},
+
+  // ENVIRONMENTAL VARIABLES
+  {id:'chelsa', label:'CHELSA / WorldClim', type:'artifact', col:11, row:2.5,
+   summary:'Bioclimatic vars per sample: bio1, bio4, bio6, bio12, bio15 + SHM.',
+   nb:'<h2>CHELSA / WorldClim</h2><p>Per-individual climate variables extracted from CHELSA v2.1 at 30 arc-second resolution using the <code>terra</code> package. Candidate variables: bio1 (mean annual temp), bio4 (temp seasonality), bio6 (min temp coldest month), bio12 (annual precip), bio15 (precip seasonality), summer heat moisture (SHM) index.</p>'},
+  {id:'soil', label:'Soil / Topo vars', type:'artifact', col:11, row:3.5,
+   summary:'SLGA plant-available water capacity, DEM-derived elevation, slope, aspect.',
+   nb:'<h2>Soil and Topographic Variables</h2><p>SLGA plant-available water capacity (preferred over TWI at Alps-wide spatial extent). DEM-derived elevation, slope, and aspect from SRTM 1 Arc-Second. Extracted per sample using <code>terra</code>.</p>'},
+  {id:'rda_step', label:'Bootstrapped Stepwise RDA Var Sel.', type:'action', col:13, row:3,
+   summary:'Bootstrapped forward stepwise RDA selects env vars explaining independent genetic variance across 30 random SNP subsets.',
+   nb:'<h2>Bootstrapped Stepwise RDA Variable Selection</h2><p>To identify a robust, non-redundant set of environmental predictors without circularity in collinearity filtering, we implement a bootstrapped forward stepwise RDA across 30 independent runs.</p><p><strong>SNP subset:</strong> 100k SNPs drawn randomly per run from the full filtered matrix.</p><p><strong>Variable order:</strong> Candidate predictor entry order randomized each run to avoid greedy path dependency.</p><p><strong>Selection:</strong> ordiR2step() with 999 permutations per step, adjusted R² stopping rule (Blanchet et al. 2008).</p><p><strong>Consensus:</strong> Predictors ranked by inclusion frequency across runs (≥50% threshold) and mean adjusted R². Where retained candidates are pairwise correlated (r &gt; 0.7), the preferred variable is selected based on frequency, mean R², and ecological relevance.</p>'},
+  {id:'env_sel', label:'Selected Env. Variables', type:'artifact', col:14, row:3,
+   summary:'Parsimonious, non-redundant environmental predictors. Input to RDA, pRDA, LFMM, GF, BayPass.',
+   nb:'<h2>Selected Environmental Variables</h2><p>Parsimonious set of environmental predictors surviving stepwise RDA selection - non-redundant by construction. Used as predictors in all GEA methods: RDA (uncorrected), pRDA (structure-corrected), LFMM, GF, GF-X, and BayPass.</p>'},
+
+  // GEA METHODS
+  {id:'binning', label:'Population Binning', type:'action', col:15, row:2,
+   summary:'Populations defined by location, refined using PCA structure to avoid mixing divergent gene pools.',
+   nb:'<h2>Population Binning</h2><p>Populations are initially defined by sampling location. Where genetically distinct clusters (identified via PCA) co-occur within a site, individuals are subdivided to maintain genetic coherence. Continuous variation (admixture) is not subdivided. This ensures allele frequencies reflect biologically meaningful units for BayPass.</p><div class="note">Balances geographic sampling with genetic structure to avoid both artificial clustering and mixing divergent lineages.</div>'},
+  {id:'baypass', label:'BayPass', type:'action', col:16, row:2,
+   summary:'Population-level GEA using allele frequencies with Ω covariance to account for structure.',
+   nb:'<h2>BayPass</h2><p>BayPass tests for associations between allele frequencies and environmental variables across populations. Allele counts per population are modeled with a covariance matrix (Ω) that captures shared demographic history, reducing false positives due to drift. Associations evaluated using Bayes Factors, calibrated via pseudo-observed datasets.</p><div class="note">Structure-aware method operating on population allele frequencies; complements individual-level approaches (LFMM, pRDA) in the ensemble.</div>'},
+  {id:'omega', label:'Ω matrix', type:'artifact', col:17, row:2,
+   summary:'Population covariance matrix from BayPass capturing neutral structure.',
+   nb:'<h2>Ω matrix</h2><p>Estimated by BayPass from population allele frequencies. Represents the neutral covariance among populations, capturing shared drift and historical relationships. Used to correct allele-environment association statistics and feeds GF-X for structure-corrected allele frequency input.</p>'},
+  {id:'prda', label:'pRDA', type:'action', col:16, row:1,
+   summary:'Partial RDA conditioning on K PC axes. Structure-aware. FDR 5%.',
+   nb:'<h2>pRDA - Structure-Corrected RDA</h2><p>Partial RDA conditioning on the K significant PC axes as covariates, removing variance attributable to neutral population structure before testing environment associations. Outliers via Mahalanobis distance, FDR 5%.</p><div class="note">Structure-aware. Candidates must appear in at least one structure-aware method (pRDA, LFMM, GF-X, or BayPass) to enter the final set.</div>'},
+
+  // VARIANCE PARTITIONING
+  {id:'var_partition', label:'Variance Partitioning', type:'action', col:17, row:1, rq:'rq1',
+   summary:'pRDA-based varpart() decomposes genetic variance into geography, climate, neutral structure, and residual fractions.',
+   nb:'<h2>Variance Partitioning</h2><p>Using the pRDA framework, <code>varpart()</code> from the vegan R package decomposes total genetic variance (Y = imputed genotype matrix or PC axes) into unique and shared fractions attributable to three predictor matrices:</p><ul style="font-family:\'Fraunces\',serif;font-size:14px;color:#c8cad4;margin:10px 0 0 18px;line-height:2;list-style:disc;"><li><strong>Geography</strong> - dbMEM spatial eigenvectors capturing IBD at multiple scales</li><li><strong>Climate</strong> - selected environmental variables from stepwise RDA</li><li><strong>Neutral structure</strong> - K significant PC axes from LD-pruned PCA</li></ul><p>Unique fractions are tested for significance via <code>anova.cca()</code> with 999 permutations. The shared geography-climate fraction quantifies the confound inherent to this system. The unique climate fraction after conditioning on geography and neutral structure is the clearest evidence for isolation by environment independent of IBD.</p><p>Results address RQ1 directly: does subspecific divergence reflect environmental gradients, neutral demographic history, or excess divergence beyond both predictors? The biplot with subspecies centroids on constrained axes shows which taxa are driven by climate vs sitting discretely off the climate axis.</p><div class="note">varpart() uses adjusted R² throughout. Negative shared fractions are real and expected when predictors suppress one another - they are reported, not zeroed.</div>'},
+
+  {id:'rda', label:'RDA', type:'action', col:16, row:5,
+   summary:'Uncorrected RDA - no structure conditioning. FDR 5%. Outliers by Mahalanobis distance.',
+   nb:'<h2>RDA - Uncorrected</h2><p>RDA without structure conditioning. Detects strong environment associations but may include false positives driven by neutral structure. FDR 5%, outliers by Mahalanobis distance. Candidates detected only by RDA + GF (both uncorrected) are excluded by the intersection rule.</p><div class="note">Not structure-aware. Useful for detecting large-effect loci but must be complemented by corrected methods in the ensemble.</div>'},
+  {id:'lfmm', label:'LFMM', type:'action', col:16, row:4,
+   summary:'Latent factor mixed model. Univariate per variable, per SNP. Structure-aware via K latent factors.',
+   nb:'<h2>LFMM</h2><p>Latent factor mixed model. Tests each SNP individually against each environmental variable. Population structure controlled via K latent factors (K from Tracy-Widom test on PCA). Run using <code>lfmm2()</code> in the LEA R package. Candidates: BH-adjusted p &lt; 0.05.</p><div class="note">Structure-aware. One of the required methods for a candidate to enter the intersection set.</div>'},
+  {id:'gf', label:'GF', type:'action', col:16, row:6,
+   summary:'Gradient Forest. Nonparametric allele turnover modelling. Top 0.5% R2 outliers.',
+   nb:'<h2>Gradient Forest</h2><p>Gradient Forest fits random forest models of allele frequency turnover along environmental gradients. Nonparametric - no assumption of linearity. No structure correction. Outlier SNPs identified by empirical R2 rank (top 0.5%), run three independent times with consensus.</p><div class="note">Not structure-aware. Candidates found only by GF + RDA (both uncorrected) are excluded by the intersection rule.</div>'},
+  {id:'gfx', label:'GF-X', type:'action', col:16, row:3,
+   summary:'Gradient Forest on structure-corrected allele frequencies using Ω matrix. Top 0.5% R2.',
+   nb:'<h2>GF-X (Structure-Corrected Gradient Forest)</h2><p>Gradient Forest run on allele frequencies corrected for population structure using the Ω matrix from BayPass. Nonparametric allele turnover modelling along environmental gradients with reduced neutral confounding. Outliers by empirical R2 rank (top 0.5%), consensus across three independent runs.</p><div class="note">Structure-aware. Satisfies the structure-aware requirement for candidate intersection.</div>'},
+  {id:'intersect', label:'Candidate Intersection', type:'action', col:18, row:3.5,
+   summary:'>= 2 methods AND at least one structure-aware (pRDA, LFMM, GF-X, or BayPass).',
+   nb:'<h2>Candidate Intersection</h2><p>SNPs enter the final candidate set only if they: (1) appear in 2 or more GEA methods, <strong>and</strong> (2) at least one of those methods is structure-aware (pRDA, LFMM, GF-X, or BayPass).</p><p>This prevents loci detected only by the two uncorrected methods (RDA + GF) from entering the candidate set, imposing biological discipline without over-correcting.</p>'},
+  {id:'candidates', label:'Candidate SNPs', type:'artifact', col:19, row:3.5, rq:'rq2',
+   summary:'Final putatively adaptive loci from GEA ensemble. Annotated against E. regnans gene models.',
+   nb:'<h2>Candidate SNPs</h2><p>Final set of putatively adaptive loci surviving the ensemble intersection filter. Annotated against <em>E. regnans</em> gene models for functional interpretation. These loci represent genomic regions associated with climate adaptation in <em>E. pauciflora</em>.</p>'},
+
+  // CANDIDATE VCF SUBSETTING
+  {id:'candidate_vcf', label:'Candidate VCF', type:'artifact', col:17, row:-3,
+   summary:'Full VCF subset to candidate loci only. Input to all GO methods.',
+   nb:'<h2>Candidate VCF</h2><p>The full Snow Gum VCF is subset to the candidate loci using <code>bcftools view --include ID==@candidates.txt</code>. This candidate-only VCF is the input to GF, GF-X, RDA, LFMM, and GDM for genomic offset calculation.</p><pre>bcftools view \\\n  --include \'ID==@candidates.txt\' \\\n  snow_gum_filtered.vcf.gz \\\n  -O z -o candidates.vcf.gz</pre><div class="note">Using candidate SNPs rather than all SNPs for GO is expected to sharpen signal: adaptive loci capture gene-climate relationships more cleanly than genome-wide background. LFMM on all SNPs is run separately as a comparator.</div>'},
+
+  // GO METHODS
+  {id:'go_gf', label:'GF', type:'action', col:19, row:-5,
+   summary:'Gradient Forest fit to candidate SNPs. GO = Euclidean distance in turnover-transformed space.',
+   nb:'<h2>GF - Genomic Offset</h2><p>Gradient Forest is fit to the candidate VCF against selected environmental variables. Allele frequencies are transformed into GF turnover space, where Euclidean distance between current and projected (future climate) compositions gives the genomic offset per population.</p><p>Models are fit once and projected to future climate per GCM. Three replicate runs; mean turnover used for GO.</p><div class="note">Nonparametric. No assumption of linearity in allele-environment relationships.</div>'},
+  {id:'go_rda', label:'RDA', type:'action', col:19, row:-4,
+   summary:'RDA fit to candidate SNPs. GO = distance along significant RDA axes under future climate.',
+   nb:'<h2>RDA - Genomic Offset</h2><p>RDA fit to the candidate VCF. GO is the distance along significant RDA axes between the current genomic composition and the composition predicted to be optimal under projected future climate - the linear projection approach of Capblancq &amp; Forester (2021).</p>'},
+  {id:'go_lfmm', label:'LFMM', type:'action', col:19, row:-3,
+   summary:'LFMM fit to candidate SNPs. GO = RONA-style predicted allele frequency change.',
+   nb:'<h2>LFMM - Genomic Offset (candidate SNPs)</h2><p>LFMM is fit to the candidate VCF against each selected environmental variable. GO is calculated as the risk of non-adaptedness (RONA): the predicted allele frequency change required to match the future climate optimum, summed across candidate loci.</p><div class="note">This candidate-SNP LFMM run is for GO only - it does not feed back into candidate detection.</div>'},
+  {id:'go_gdm', label:'GDM', type:'action', col:19, row:-2,
+   summary:'Generalised Dissimilarity Modelling on candidate SNPs. GO = I-spline distance current vs future.',
+   nb:'<h2>GDM - Genomic Offset</h2><p>Generalised Dissimilarity Modelling (GDM) models pairwise genetic dissimilarity as a nonlinear function of environmental distance using I-splines. GO is the I-spline distance between current and projected environmental conditions, reflecting predicted compositional change under future climate.</p><p>GDM is fit to pairwise Fst (or Bray-Curtis dissimilarity) among sampling sites calculated from the candidate VCF.</p><div class="note">GDM operates on pairwise site-level data rather than individual genotypes; requires sufficient sampling across the environmental gradient.</div>'},
+  {id:'lfmm_all', label:'LFMM (all SNPs)', type:'action', col:19, row:-1,
+   summary:'LFMM run genome-wide (all filtered SNPs). GO comparator only - not used for candidate detection.',
+   nb:'<h2>LFMM (all SNPs) - Genomic Offset Comparator</h2><p>LFMM is uniquely suited to run without prior candidate selection because its latent factor structure controls for neutral covariation genome-wide. This all-SNP run produces gene-climate effect-size estimates for every SNP in the filtered VCF.</p><p>This run does <em>not</em> feed the candidate intersection. Following Archambeau et al. (2024), comparing GO from candidate SNPs vs all SNPs tests whether pre-selection sharpens predictions.</p><div class="note">If all-SNP and candidate-SNP LFMM GO diverge substantially, candidate filtering is doing meaningful work. If they agree, genome-wide signal is dominated by adaptive loci anyway.</div>'},
+
+  // FUTURE CLIMATE
+  {id:'future_climate', label:'Future Climate', type:'artifact', col:16, row:-5,
+   summary:'Chelsa future climate data.',
+   nb:'<h2>Future Climate Data</h2><p>The same selected environmental variables used in GEA are extracted for future conditions at each sampled population using CHELSA predictions.</p>'},
+
+  // GO ENSEMBLE
+  {id:'go_ensemble', label:'GO Ensemble', type:'action', col:21, row:-3,
+   summary:'GO predictions from all methods x SNP sets x GCMs compared, averaged, and ranked.',
+   nb:'<h2>GO Ensemble</h2><p>GO predictions from all method-SNP set combinations are assembled: GF (candidates), RDA (candidates), LFMM (candidates), GDM (candidates), and LFMM (all SNPs).</p><ol style="font-family:\'Fraunces\',serif;font-size:14px;color:#c8cad4;margin:10px 0 0 18px;line-height:2;"><li>Average GO across GCMs per method-SNP set to get mean GO and per-pixel SD (climate uncertainty)</li><li>Pairwise Pearson correlations among all method x SNP set combinations</li><li>Rank populations by GO within each method; compute mean rank across methods</li><li>Flag populations with consistent high rank as high-confidence high-risk</li></ol><div class="note">Following Archambeau et al. (2024). Concordant predictions across methods carry greater credibility than any single method alone. Disagreement is reported explicitly rather than silently resolved by averaging.</div>'},
+  {id:'go_pred', label:'GO Predictions', type:'artifact', col:22, row:-3, rq:'rq3',
+   summary:'Per-population GO values, all methods x SNP sets. Averaged across GCMs, with per-GCM uncertainty.',
+   nb:'<h2>GO Predictions</h2><p>Final per-population GO values for each method-SNP set combination, averaged across five GCMs (plus per-GCM outputs for uncertainty quantification). Pairwise correlations among all combinations are reported alongside the predictions.</p><p>Populations ranking consistently high across methods are the most credible candidates for climate maladaptation.</p><div class="note">These are current-to-future maladaptation estimates: the genomic change required to remain adapted under projected climate. They do not account for plasticity, dispersal capacity, or standing variation.</div>'},
+];
+
+const EDGES = [
+  // Sequencing + genotyping
+  ['sample_collection','dna_extraction'],
+  ['dna_extraction','sr_lib'],['dna_extraction','lr_lib'],
+  ['sr_lib','sr_qc'],['sr_qc','bwa'],['ref','bwa'],['bwa','sr_bam'],['sr_bam','deepvar'],['deepvar','left_join'],
+  ['lr_lib','basecall'],['basecall','minimap'],['ref','minimap'],['minimap','lr_bam'],['lr_bam','longcalld'],['longcalld','left_join'],
+  ['left_join','samp_filt'],['samp_filt','snp_filt'],['snp_filt','full_vcf'],
+
+  // Genotype matrix prep
+  ['full_vcf','geno_matrix'],
+  ['geno_matrix','geno_matrix_art'],
+
+  // Population structure
+  ['full_vcf','ld_prune'],['ld_prune','pca'],
+  ['full_vcf','fst'],
+
+  // Env var selection
+  ['chelsa','rda_step'],['soil','rda_step'],['geno_matrix_art','rda_step'],['rda_step','env_sel'],
+
+  // GEA methods
+  ['geno_matrix_art','prda'],['geno_matrix_art','rda'],['geno_matrix_art','gf'],
+  ['full_vcf','lfmm'],
+  ['pca','lfmm'],['pca','prda'],
+  ['env_sel','prda'],['env_sel','lfmm'],['env_sel','gf'],['env_sel','rda'],['env_sel','baypass'],['env_sel','gfx'],
+
+  // Variance partitioning from pRDA
+  ['prda','var_partition'],
+
+  // BayPass / GF-X
+  ['pca','binning'],['binning','baypass'],['baypass','omega'],['omega','gfx'],
+  ['full_vcf','gfx'],
+
+  // GEA intersection
+  ['prda','intersect'],['lfmm','intersect'],['gf','intersect'],['rda','intersect'],
+  ['gfx','intersect'],['baypass','intersect'],
+  ['intersect','candidates'],
+
+  // Candidate VCF
+  ['candidates','candidate_vcf'],['full_vcf','candidate_vcf'],
+
+  // GO methods
+  ['candidate_vcf','go_gf'],['candidate_vcf','go_rda'],['candidate_vcf','go_lfmm'],['candidate_vcf','go_gdm'],
+  ['env_sel','future_climate'],
+  ['future_climate','go_gf'],['future_climate','go_rda'],['future_climate','go_lfmm'],['future_climate','go_gdm'],
+  ['full_vcf','lfmm_all'],['pca','lfmm_all'],['future_climate','lfmm_all'],
+
+  // GO ensemble
+  ['go_gf','go_ensemble'],['go_rda','go_ensemble'],['go_lfmm','go_ensemble'],
+  ['go_gdm','go_ensemble'],['lfmm_all','go_ensemble'],
+  ['go_ensemble','go_pred'],
+];
+
+const LANES = [
+  {label:'Illumina short-read',  col:2.5, row:-1.5, offsetY:-NH},
+  {label:'Oxford Nanopore',      col:2.5, row: 1.5,  offsetY:-NH},
+  {label:'Population Structure', col:13,  row:-4,    offsetY:-NH},
+  {label:'GEA Ensemble',         col:16,  row: 1,  offsetY:-NH},
+  {label:'GO Methods',           col:19,  row:-5,  offsetY:-NH},
+  {label:'Genomic Offset',       col:22,  row:-3,    offsetY:-NH},
+];
+
+const pos = {};
+NODES.forEach(n => { pos[n.id] = {x: PAD + n.col*COL, y: CY + n.row*ROW}; });
+const minY = Math.min(...NODES.map(n => pos[n.id].y));
+const shiftY = minY < 60 ? 60 - minY : 0;
+NODES.forEach(n => { pos[n.id].y += shiftY; });
+const contentW = Math.max(...NODES.map(n => pos[n.id].x + NW)) + PAD;
+const contentH = Math.max(...NODES.map(n => pos[n.id].y + NH)) + PAD + 80;
+
+function ports(id) {
+  const p = pos[id];
+  return {
+    r: {x: p.x+NW, y: p.y+NH/2}, l: {x: p.x, y: p.y+NH/2},
+    t: {x: p.x+NW/2, y: p.y},    b: {x: p.x+NW/2, y: p.y+NH}
+  };
+}
+function buildPath(f, t) {
+  const fcx = pos[f].x+NW/2, fcy = pos[f].y+NH/2;
+  const tcx = pos[t].x+NW/2, tcy = pos[t].y+NH/2;
+  const dx = tcx-fcx, dy = tcy-fcy;
+  const fp = ports(f), tp = ports(t);
+  let src, dst, cdx, cdy;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    if (dx >= 0) { src=fp.r; dst=tp.l; cdx=1; cdy=0; }
+    else          { src=fp.l; dst=tp.r; cdx=-1; cdy=0; }
+  } else {
+    if (dy >= 0) { src=fp.b; dst=tp.t; cdx=0; cdy=1; }
+    else          { src=fp.t; dst=tp.b; cdx=0; cdy=-1; }
+  }
+  const pull = Math.max(Math.sqrt(dx*dx+dy*dy)*0.42, 36);
+  return `M ${src.x} ${src.y} C ${src.x+cdx*pull} ${src.y+cdy*pull}, ${dst.x-cdx*pull} ${dst.y-cdy*pull}, ${dst.x} ${dst.y}`;
+}
+
+const stage = document.getElementById('stage');
+const svgEl = document.getElementById('connectors');
+const viewport = document.getElementById('viewport');
+const sidebar = document.getElementById('sidebar');
+const sidebarInner = document.getElementById('sidebar-inner');
+const sidebarTab = document.getElementById('sidebar-tab');
+const tooltip = document.getElementById('tooltip');
+const ttTitle = document.getElementById('tt-title');
+const ttSummary = document.getElementById('tt-summary');
+
+stage.style.width = contentW + 'px';
+stage.style.height = contentH + 'px';
+svgEl.setAttribute('width', contentW);
+svgEl.setAttribute('height', contentH);
+
+const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+[
+  {id:'arr', color:'#2a3040'},
+  {id:'arr-rq1', color:'rgba(224,123,84,0.55)'},
+  {id:'arr-rq2', color:'rgba(106,177,135,0.55)'},
+  {id:'arr-rq3', color:'rgba(167,139,218,0.55)'},
+].forEach(function(md) {
+  const m = document.createElementNS('http://www.w3.org/2000/svg','marker');
+  m.setAttribute('id', md.id); m.setAttribute('viewBox','0 0 10 10');
+  m.setAttribute('refX','8'); m.setAttribute('refY','5');
+  m.setAttribute('markerWidth','5'); m.setAttribute('markerHeight','5');
+  m.setAttribute('orient','auto-start-reverse');
+  const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+  p.setAttribute('d','M2 1L8 5L2 9'); p.setAttribute('fill','none');
+  p.setAttribute('stroke', md.color); p.setAttribute('stroke-width','1.5');
+  p.setAttribute('stroke-linecap','round'); p.setAttribute('stroke-linejoin','round');
+  m.appendChild(p); defs.appendChild(m);
+});
+svgEl.appendChild(defs);
+
+const rqMap = {};
+NODES.forEach(function(n) { if (n.rq) rqMap[n.id] = n.rq; });
+
+EDGES.forEach(function(e) {
+  const f = e[0], t = e[1];
+  const rq = rqMap[t] || rqMap[f];
+  const stroke = rq==='rq1' ? 'rgba(224,123,84,0.35)' : rq==='rq2' ? 'rgba(106,177,135,0.35)' : rq==='rq3' ? 'rgba(167,139,218,0.35)' : '#2a3040';
+  const marker = rq==='rq1' ? 'url(#arr-rq1)' : rq==='rq2' ? 'url(#arr-rq2)' : rq==='rq3' ? 'url(#arr-rq3)' : 'url(#arr)';
+  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d', buildPath(f, t));
+  path.setAttribute('fill','none'); path.setAttribute('stroke', stroke);
+  path.setAttribute('stroke-width','1.5'); path.setAttribute('marker-end', marker);
+  svgEl.appendChild(path);
+});
+
+LANES.forEach(function(l) {
+  const el = document.createElement('div');
+  el.className = 'lane-label'; el.textContent = l.label;
+  el.style.left = (PAD + l.col*COL) + 'px';
+  el.style.top  = (CY + l.row*ROW + l.offsetY + shiftY) + 'px';
+  stage.appendChild(el);
+});
+
+let activeNode = null;
+
+function openSidebar(n) {
+  const rqC = n.rq==='rq1' ? '#e07b54' : n.rq==='rq2' ? '#6ab187' : n.rq==='rq3' ? '#a78bda' : '';
+  const rqNum = n.rq==='rq1' ? '1' : n.rq==='rq2' ? '2' : n.rq==='rq3' ? '3' : '';
+  const rqTag = n.rq ? ('<span class="rq-tag" style="background:'+rqC+'22;color:'+rqC+';border:1px solid '+rqC+'88;">Research Question '+rqNum+'</span>') : '';
+  sidebarInner.innerHTML = rqTag + (n.nb || ('<h2>'+n.label+'</h2><p>'+n.summary+'</p>'));
+  sidebar.classList.add('open'); sidebarTab.classList.add('hidden');
+}
+function closeSidebar() {
+  sidebar.classList.remove('open'); sidebarTab.classList.remove('hidden');
+  if (activeNode) { activeNode.classList.remove('active'); activeNode = null; }
+}
+
+document.getElementById('sidebar-close').addEventListener('click', closeSidebar);
+sidebarTab.addEventListener('click', function() {
+  if (activeNode) { sidebar.classList.add('open'); sidebarTab.classList.add('hidden'); }
+});
+
+NODES.forEach(function(n) {
+  const p = pos[n.id];
+  const el = document.createElement('div');
+  el.className = 'node ' + n.type + (n.rq ? ' ' + n.rq : '');
+  el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
+  el.innerHTML = '<span class="node-label">' + n.label + '</span>';
+  el.addEventListener('click', function(e) {
+    e.preventDefault(); hideTooltip();
+    if (activeNode === el && sidebar.classList.contains('open')) { closeSidebar(); return; }
+    if (activeNode) activeNode.classList.remove('active');
+    activeNode = el; el.classList.add('active'); openSidebar(n);
+  });
+  el.addEventListener('mouseenter', function(e) { showTooltip(e, n); });
+  el.addEventListener('mousemove',  function(e) { positionTooltip(e); });
+  el.addEventListener('mouseleave', function()  { hideTooltip(); });
+  stage.appendChild(el);
+});
+
+let scale=1, tx=0, ty=0;
+const MIN_SCALE=0.12, MAX_SCALE=3;
+
+function applyT() {
+  stage.style.transform = 'translate('+tx+'px,'+ty+'px) scale('+scale+')';
+  document.getElementById('zoomLabel').textContent = Math.round(scale*100) + '%';
+}
+function clampS(s) { return Math.min(MAX_SCALE, Math.max(MIN_SCALE, s)); }
+function fitToView() {
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  scale = clampS(Math.min(vw/contentW, vh/contentH) * 0.88);
+  tx = (vw - contentW*scale) / 2; ty = (vh - contentH*scale) / 2; applyT();
+}
+
+viewport.addEventListener('wheel', function(e) {
+  e.preventDefault();
+  const r = viewport.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
+  const d = e.deltaY < 0 ? 1.08 : 1/1.08;
+  const ns = clampS(scale*d), ratio = ns/scale;
+  tx = mx - ratio*(mx-tx); ty = my - ratio*(my-ty); scale = ns; applyT();
+}, {passive:false});
+
+let dragging=false, dsx, dsy, dtx, dty;
+viewport.addEventListener('mousedown', function(e) {
+  if (e.target.closest('.node')) return;
+  dragging=true; dsx=e.clientX; dsy=e.clientY; dtx=tx; dty=ty; e.preventDefault();
+});
+window.addEventListener('mousemove', function(e) {
+  if (!dragging) return;
+  tx = dtx + (e.clientX-dsx); ty = dty + (e.clientY-dsy); applyT();
+});
+window.addEventListener('mouseup', function() { dragging = false; });
+
+document.getElementById('zoomIn').addEventListener('click', function() {
+  const cx=viewport.clientWidth/2, cy=viewport.clientHeight/2, ns=clampS(scale*1.2), r=ns/scale;
+  tx=cx-r*(cx-tx); ty=cy-r*(cy-ty); scale=ns; applyT();
+});
+document.getElementById('zoomOut').addEventListener('click', function() {
+  const cx=viewport.clientWidth/2, cy=viewport.clientHeight/2, ns=clampS(scale/1.2), r=ns/scale;
+  tx=cx-r*(cx-tx); ty=cy-r*(cy-ty); scale=ns; applyT();
+});
+document.getElementById('zoomReset').addEventListener('click', fitToView);
+window.addEventListener('load', fitToView);
+
+function showTooltip(e, n) {
+  ttTitle.innerHTML = n.label; ttSummary.textContent = n.summary;
+  positionTooltip(e); tooltip.classList.add('visible');
+}
+function positionTooltip(e) {
+  const tw=270, th=110;
+  let x=e.clientX+16, y=e.clientY+16;
+  if (x+tw > window.innerWidth-8)  x = e.clientX-tw-16;
+  if (y+th > window.innerHeight-8) y = e.clientY-th-16;
+  tooltip.style.left = x+'px'; tooltip.style.top = y+'px';
+}
+function hideTooltip() { tooltip.classList.remove('visible'); }
+
+const shapeToggle = document.getElementById('shapeToggle');
+const shapePanel  = document.getElementById('shapePanel');
+document.getElementById('shapePanelTitle').addEventListener('click', function() {
+  shapePanel.classList.add('hidden'); shapeToggle.classList.add('visible');
+});
+shapeToggle.addEventListener('click', function() {
+  shapeToggle.classList.remove('visible'); shapePanel.classList.remove('hidden');
+});
+
+const rqToggle = document.getElementById('rqToggle');
+const rqPanel  = document.getElementById('rqPanel');
+document.getElementById('rqPanelTitle').addEventListener('click', function() {
+  rqPanel.classList.add('hidden'); rqToggle.classList.add('visible');
+});
+rqToggle.addEventListener('click', function() {
+  rqToggle.classList.remove('visible'); rqPanel.classList.remove('hidden');
+});
+</script>
+</body>
+</html>
