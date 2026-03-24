@@ -223,9 +223,25 @@ const NODES = [
   {id:'soil', label:'Soil / Topo vars', type:'artifact', col:11, row:3.5,
    summary:'SLGA plant-available water capacity, DEM-derived elevation, slope, aspect.',
    nb:'<h2>Soil and Topographic Variables</h2><p>SLGA plant-available water capacity (preferred over TWI at Alps-wide spatial extent). DEM-derived elevation, slope, and aspect from SRTM 1 Arc-Second. Extracted per sample using <code>terra</code>.</p>'},
-  {id:'rda_step', label:'Bootstrapped Stepwise RDA Var Sel.', type:'action', col:13, row:3,
-   summary:'Bootstrapped forward stepwise RDA selects env vars explaining independent genetic variance across 30 random SNP subsets.',
-   nb:'<h2>Bootstrapped Stepwise RDA Variable Selection</h2><p>To identify a robust, non-redundant set of environmental predictors without circularity in collinearity filtering, we implement a bootstrapped forward stepwise RDA across 30 independent runs.</p><p><strong>SNP subset:</strong> 100k SNPs drawn randomly per run from the full filtered matrix.</p><p><strong>Variable order:</strong> Candidate predictor entry order randomized each run to avoid greedy path dependency.</p><p><strong>Selection:</strong> ordiR2step() with 999 permutations per step, adjusted R² stopping rule (Blanchet et al. 2008).</p><p><strong>Consensus:</strong> Predictors ranked by inclusion frequency across runs (≥50% threshold) and mean adjusted R². Where retained candidates are pairwise correlated (r &gt; 0.7), the preferred variable is selected based on frequency, mean R², and ecological relevance.</p>'},
+  {
+  id:'rda_step',
+  label:'Bootstrapped Stepwise RDA Var Sel.',
+  type:'action',
+  col:13,
+  row:3,
+  summary:'Stability-based ranking of environmental predictors using repeated forward RDA on random SNP subsets.',
+  nb:`
+    <h2>Bootstrapped Stepwise RDA Variable Screening</h2>
+    <p>This procedure provides a stability-based ranking of environmental predictors to guide variable selection under high dimensionality and collinearity. Rather than relying on a single stepwise model, we quantify how consistently predictors are selected across repeated perturbations of the genomic dataset.</p>
+    <p><strong>Runs:</strong> 30 independent runs using random SNP subsets.</p>
+    <p><strong>SNP subset:</strong> 100k SNPs randomly drawn per run from the full filtered matrix to reduce computational burden and capture variability in genomic signal.</p>
+    <p><strong>Variable order:</strong> Candidate predictor entry order randomized each run to reduce path dependence in forward selection.</p>
+    <p><strong>Selection:</strong> Forward stepwise RDA using <code>ordiR2step()</code> with 1,000 permutations per step, significance threshold p &lt; 0.01, and stopping at the adjusted R² of the global model, following <em>Capblancq and Forester (2021)</em>.</p>
+    <p><strong>Output (stability ranking):</strong> Predictors are summarised by inclusion frequency across runs and mean adjusted R². These metrics reflect selection stability under resampling, not independent effect size or causality.</p>
+    <p><strong>Collinearity handling:</strong> Predictors with |r| &gt; 0.7 are grouped into correlated clusters representing shared environmental gradients. Within each cluster, a single representative variable is retained using a hierarchical rule: (1) highest inclusion frequency, (2) higher mean adjusted R² where frequencies are similar, and (3) ecological interpretability.</p>
+    <p><strong>Interpretation:</strong> This procedure identifies consistently selected predictors and highlights redundancy among correlated variables. It does not resolve causal drivers within collinear groups, but provides a structured, quantitative basis for downstream ecological selection.</p>
+  `
+},
   {id:'env_sel', label:'Selected Env. Variables', type:'artifact', col:14, row:3,
    summary:'Parsimonious, non-redundant environmental predictors. Input to RDA, pRDA, LFMM, GF, BayPass.',
    nb:'<h2>Selected Environmental Variables</h2><p>Parsimonious set of environmental predictors surviving stepwise RDA selection - non-redundant by construction. Used as predictors in all GEA methods: RDA (uncorrected), pRDA (structure-corrected), LFMM, GF, GF-X, and BayPass.</p>'},
